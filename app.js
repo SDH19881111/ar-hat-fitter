@@ -262,7 +262,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Main real-time prediction and rendering loop
   function predictLoop() {
-    if (!video.srcObject || video.paused || video.ended) {
+    if (!video.srcObject || video.ended) {
+      return;
+    }
+    if (video.paused) {
+      requestAnimationFrame(predictLoop);
       return;
     }
 
@@ -397,9 +401,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const dataUrl = tempCanvas.toDataURL("image/png");
 
+    // Generate timestamp filename (e.g. ar-hat-20260624_161511.png)
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    const filename = `ar-hat-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.png`;
+
     // 3. Show photo modal
     modalPreviewImg.src = dataUrl;
     btnDownload.href = dataUrl;
+    btnDownload.download = filename;
     photoModal.classList.remove("hidden");
 
     // 4. Add to gallery list
@@ -413,6 +423,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     galleryItem.addEventListener("click", () => {
       modalPreviewImg.src = dataUrl;
       btnDownload.href = dataUrl;
+      btnDownload.download = filename;
       photoModal.classList.remove("hidden");
     });
 
@@ -451,13 +462,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Modal Actions
-  modalCloseBtn.addEventListener("click", () => {
+  function resumeAfterModal() {
     photoModal.classList.add("hidden");
-  });
+    if (video && video.paused) {
+      video.play().catch(e => console.error("Could not resume video:", e));
+    }
+  }
+
+  modalCloseBtn.addEventListener("click", resumeAfterModal);
 
   photoModal.addEventListener("click", (e) => {
     if (e.target === photoModal) {
-      photoModal.classList.add("hidden");
+      resumeAfterModal();
     }
   });
 
