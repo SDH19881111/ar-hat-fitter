@@ -23,8 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const valScale = document.getElementById("val-scale");
   const valOffset = document.getElementById("val-offset");
   const btnResetAdjust = document.getElementById("btn-reset-adjust");
-  
-  const galleryList = document.getElementById("gallery-list");
+
   const photoModal = document.getElementById("photo-modal");
   const modalPreviewImg = document.getElementById("modal-preview-img");
   const btnDownload = document.getElementById("btn-download");
@@ -412,26 +411,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     btnDownload.download = filename;
     photoModal.classList.remove("hidden");
 
-    // 4. Add to gallery list
-    const galleryItem = document.createElement("div");
-    galleryItem.className = "gallery-item";
-    const imgEl = document.createElement("img");
-    imgEl.src = dataUrl;
-    galleryItem.appendChild(imgEl);
-    
-    // Clicking gallery item opens modal again
-    galleryItem.addEventListener("click", () => {
-      modalPreviewImg.src = dataUrl;
-      btnDownload.href = dataUrl;
-      btnDownload.download = filename;
-      photoModal.classList.remove("hidden");
-    });
-
-    const noImagesEl = galleryList.querySelector(".no-images");
-    if (noImagesEl) {
-      noImagesEl.remove();
-    }
-    galleryList.insertBefore(galleryItem, galleryList.firstChild);
   });
 
   // Flip Camera Front/Back
