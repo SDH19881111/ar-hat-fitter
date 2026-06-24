@@ -46,49 +46,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Hat Settings config (default positions for individual high-res hats)
   const hatConfigs = {
     headdress: {
-      url: "assets/headdress.png",
+      url: "assets/headdress.png?v=2",
       offsetY: 0.08,  // relative to faceHeight (vertical offset)
       scale: 1.85,    // multiplier for faceWidth
       processedCanvas: null,
       loaded: false
     },
     cowboy: {
-      url: "assets/cowboy.png",
+      url: "assets/cowboy.png?v=2",
       offsetY: 0.15,
       scale: 1.80,
       processedCanvas: null,
       loaded: false
     },
     nonla: {
-      url: "assets/nonla.png",
+      url: "assets/nonla.png?v=2",
       offsetY: 0.10,  // rests on forehead
       scale: 2.10,
       processedCanvas: null,
       loaded: false
     },
     pharaoh: {
-      url: "assets/pharaoh.png",
+      url: "assets/pharaoh.png?v=2",
       offsetY: 0.35,  // aligns headband to eyebrows
       scale: 1.80,
       processedCanvas: null,
       loaded: false
     },
     turban: {
-      url: "assets/turban.png",
+      url: "assets/turban.png?v=2",
       offsetY: 0.15,  // rests on forehead
       scale: 1.90,
       processedCanvas: null,
       loaded: false
     },
     white_hat: {
-      url: "assets/white_hat.png",
+      url: "assets/white_hat.png?v=2",
       offsetY: 0.15,  // rests on forehead
       scale: 1.90,
       processedCanvas: null,
       loaded: false
     },
     sombrero: {
-      url: "assets/sombrero.png",
+      url: "assets/sombrero.png?v=2",
       offsetY: 0.15,  // rests on forehead
       scale: 2.00,
       processedCanvas: null,
