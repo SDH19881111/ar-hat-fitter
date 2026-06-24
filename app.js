@@ -47,28 +47,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   const hatConfigs = {
     headdress: {
       url: "assets/headdress.png",
-      offsetY: -0.42, // relative to faceHeight (vertical offset)
+      offsetY: -0.05, // relative to faceHeight (vertical offset)
       scale: 1.85,    // multiplier for faceWidth
       processedCanvas: null,
       loaded: false
     },
     cowboy: {
       url: "assets/cowboy.png",
-      offsetY: -0.22,
+      offsetY: 0.08,
       scale: 1.75,
       processedCanvas: null,
       loaded: false
     },
     nonla: {
       url: "assets/nonla.png",
-      offsetY: -0.28,
+      offsetY: -0.12,
       scale: 1.95,
       processedCanvas: null,
       loaded: false
     },
     pharaoh: {
       url: "assets/pharaoh.png",
-      offsetY: -0.05,
+      offsetY: 0.15,
       scale: 1.70,
       processedCanvas: null,
       loaded: false
