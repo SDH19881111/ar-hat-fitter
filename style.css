@@ -99,6 +99,14 @@ body {
   gap: 16px;
 }
 
+@media (min-width: 969px) {
+  .viewer-section {
+    position: sticky;
+    top: 20px;
+    height: max-content;
+  }
+}
+
 .camera-wrapper {
   position: relative;
   width: 100%;

@@ -43,32 +43,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   let userScaleAdj = 100; // in percentage (50% to 250%)
   let userOffsetAdj = 0;   // in percentage (-100% to 100%)
 
-  // Hat Settings config
+  // Hat Settings config (default positions lowered)
   const hatConfigs = {
     headdress: {
       url: "assets/headdress.png",
-      offsetY: -0.05, // relative to faceHeight (vertical offset)
+      offsetY: 0.10, // relative to faceHeight (vertical offset)
       scale: 1.85,    // multiplier for faceWidth
       processedCanvas: null,
       loaded: false
     },
     cowboy: {
       url: "assets/cowboy.png",
-      offsetY: 0.08,
+      offsetY: 0.22,
       scale: 1.75,
       processedCanvas: null,
       loaded: false
     },
     nonla: {
       url: "assets/nonla.png",
-      offsetY: -0.12,
+      offsetY: 0.05,
       scale: 1.95,
       processedCanvas: null,
       loaded: false
     },
     pharaoh: {
       url: "assets/pharaoh.png",
-      offsetY: 0.15,
+      offsetY: 0.32,
       scale: 1.70,
       processedCanvas: null,
       loaded: false
@@ -241,8 +241,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             const offsetAdjustY = userOffsetAdj / 100; // Range [-1.0, 1.0]
 
             const finalScale = hatConfig.scale * scaleMultiplier;
-            // The vertical offset adjusts down/up based on faceHeight
-            const finalOffsetY = hatConfig.offsetY + (offsetAdjustY * 0.2);
+            // The vertical offset adjusts down/up based on faceHeight (increased range to 2.5)
+            const finalOffsetY = hatConfig.offsetY + (offsetAdjustY * 2.5);
 
             const hatWidth = faceWidth * canvas.width * finalScale;
             const hatHeight = hatWidth * (hatConfig.processedCanvas.height / hatConfig.processedCanvas.width);
