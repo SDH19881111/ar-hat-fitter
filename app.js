@@ -1,3 +1,5 @@
+import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/+esm";
+
 // Global Traditional Hat AR App Logic
 document.addEventListener("DOMContentLoaded", async () => {
   // Elements
@@ -124,18 +126,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Initialize MediaPipe Face Landmarker
   async function initFaceLandmarker() {
     try {
-      const vision = window.vision;
-      if (!vision) {
-        throw new Error("MediaPipe Vision library was not loaded successfully.");
-      }
-
       // Initialize the fileset resolver for vision tasks
-      const filesetResolver = await vision.FilesetResolver.forVisionTasks(
+      const filesetResolver = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
       );
 
       // Create FaceLandmarker
-      faceLandmarker = await vision.FaceLandmarker.createFromOptions(filesetResolver, {
+      faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
         baseOptions: {
           modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
           delegate: "GPU"
