@@ -43,33 +43,54 @@ document.addEventListener("DOMContentLoaded", async () => {
   let userScaleAdj = 100; // in percentage (50% to 250%)
   let userOffsetAdj = 0;   // in percentage (-100% to 100%)
 
-  // Hat Settings config (default positions lowered)
+  // Hat Settings config (default positions lowered for hollow shapes)
   const hatConfigs = {
     headdress: {
       url: "assets/headdress.png",
-      offsetY: 0.10, // relative to faceHeight (vertical offset)
+      offsetY: 0.08, // relative to faceHeight (vertical offset)
       scale: 1.85,    // multiplier for faceWidth
       processedCanvas: null,
       loaded: false
     },
     cowboy: {
       url: "assets/cowboy.png",
-      offsetY: 0.22,
-      scale: 1.75,
+      offsetY: 0.15,
+      scale: 1.80,
       processedCanvas: null,
       loaded: false
     },
     nonla: {
       url: "assets/nonla.png",
-      offsetY: 0.05,
-      scale: 1.95,
+      offsetY: 1.05, // has chin strap, bottom of image sits under chin
+      scale: 2.10,
       processedCanvas: null,
       loaded: false
     },
     pharaoh: {
       url: "assets/pharaoh.png",
-      offsetY: 0.32,
-      scale: 1.70,
+      offsetY: 1.15, // has shoulder flaps, bottom sits below chin
+      scale: 1.80,
+      processedCanvas: null,
+      loaded: false
+    },
+    turban: {
+      url: "assets/turban.png",
+      offsetY: 1.05, // has chin strap
+      scale: 1.90,
+      processedCanvas: null,
+      loaded: false
+    },
+    white_hat: {
+      url: "assets/white_hat.png",
+      offsetY: 1.05, // has chin strap
+      scale: 1.90,
+      processedCanvas: null,
+      loaded: false
+    },
+    sombrero: {
+      url: "assets/sombrero.png",
+      offsetY: 0.18, // sits on forehead
+      scale: 2.00,
       processedCanvas: null,
       loaded: false
     }
