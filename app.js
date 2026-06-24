@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   };
 
-  // Preprocess hat images to remove white backgrounds (Chroma Key)
+  // Preprocess hat images to remove white backgrounds (Chroma Key -> Flood Fill)
   function preprocessHats() {
     const promises = Object.keys(hatConfigs).map((key) => {
       return new Promise((resolve) => {
@@ -105,31 +105,86 @@ document.addEventListener("DOMContentLoaded", async () => {
         img.src = config.url;
         img.onload = () => {
           const offscreenCanvas = document.createElement("canvas");
-          offscreenCanvas.width = img.naturalWidth;
-          offscreenCanvas.height = img.naturalHeight;
+          const width = img.naturalWidth;
+          const height = img.naturalHeight;
+          offscreenCanvas.width = width;
+          offscreenCanvas.height = height;
           const oCtx = offscreenCanvas.getContext("2d");
           oCtx.drawImage(img, 0, 0);
 
-          const imgData = oCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+          const imgData = oCtx.getImageData(0, 0, width, height);
           const data = imgData.data;
 
-          // Key out background pixels that are close to white
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
+          // Flood-fill background removal: only removes white connected to the image border
+          // This prevents removing white/pink colors inside the hat body!
+          const visited = new Uint8Array(width * height);
+          const queue = [];
 
-            // Distance from pure white (255, 255, 255)
+          function isBg(x, y) {
+            if (x < 0 || x >= width || y < 0 || y >= height) return false;
+            const idx = (y * width + x) * 4;
+            // If already fully or mostly transparent, consider it bg
+            if (data[idx + 3] < 10) return true;
+
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            // Distance from pure white
             const dist = Math.sqrt((255 - r) ** 2 + (255 - g) ** 2 + (255 - b) ** 2);
+            return dist < 40;
+          }
 
-            if (dist < 40) {
-              data[i + 3] = 0; // Make fully transparent
-            } else if (dist < 60) {
-              // Smooth transition threshold
-              const ratio = (dist - 40) / 20;
-              data[i + 3] = Math.floor(ratio * 255);
+          // Enqueue borders
+          for (let x = 0; x < width; x++) {
+             if (isBg(x, 0)) { queue.push(x, 0); visited[x] = 1; }
+             if (isBg(x, height - 1)) { queue.push(x, height - 1); visited[(height - 1) * width + x] = 1; }
+          }
+          for (let y = 0; y < height; y++) {
+             if (isBg(0, y)) { queue.push(0, y); visited[y * width] = 1; }
+             if (isBg(width - 1, y)) { queue.push(width - 1, y); visited[y * width + width - 1] = 1; }
+          }
+          
+          let head = 0;
+          while (head < queue.length) {
+             const x = queue[head++];
+             const y = queue[head++];
+             
+             // Make transparent
+             const idx = (y * width + x) * 4;
+             data[idx + 3] = 0;
+             
+             // Neighbors
+             if (x > 0 && !visited[y * width + x - 1] && isBg(x - 1, y)) { visited[y * width + x - 1] = 1; queue.push(x - 1, y); }
+             if (x < width - 1 && !visited[y * width + x + 1] && isBg(x + 1, y)) { visited[y * width + x + 1] = 1; queue.push(x + 1, y); }
+             if (y > 0 && !visited[(y - 1) * width + x] && isBg(x, y - 1)) { visited[(y - 1) * width + x] = 1; queue.push(x, y - 1); }
+             if (y < height - 1 && !visited[(y + 1) * width + x] && isBg(x, y + 1)) { visited[(y + 1) * width + x] = 1; queue.push(x, y + 1); }
+          }
+
+          // Soften the edges (optional feathering to remove white halos)
+          for (let i = 0; i < data.length; i += 4) {
+            if (data[i + 3] > 0) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              const dist = Math.sqrt((255 - r) ** 2 + (255 - g) ** 2 + (255 - b) ** 2);
+              if (dist < 60) {
+                 const idx = i / 4;
+                 const x = idx % width;
+                 const y = Math.floor(idx / width);
+                 let isEdge = false;
+                 if (x > 0 && data[i - 4 + 3] === 0) isEdge = true;
+                 else if (x < width - 1 && data[i + 4 + 3] === 0) isEdge = true;
+                 else if (y > 0 && data[i - width * 4 + 3] === 0) isEdge = true;
+                 else if (y < height - 1 && data[i + width * 4 + 3] === 0) isEdge = true;
+
+                 if (isEdge) {
+                   const ratio = Math.max(0, (dist - 40) / 20); // 0 to 1
+                   data[i + 3] = Math.floor(ratio * 255);
+                 }
+              }
             }
           }
+
           oCtx.putImageData(imgData, 0, 0);
           config.processedCanvas = offscreenCanvas;
           config.loaded = true;
@@ -256,6 +311,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             ctx.save();
             ctx.translate(anchorX, anchorY);
             ctx.rotate(rollAngle);
+            ctx.scale(-1, 1); // Flip horizontally so CSS transform doesn't make it backward
 
             // Compute scaling and offsets
             const scaleMultiplier = userScaleAdj / 100;
