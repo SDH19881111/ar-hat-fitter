@@ -1,0 +1,402 @@
+// Global Traditional Hat AR App Logic
+document.addEventListener("DOMContentLoaded", async () => {
+  // Elements
+  const video = document.getElementById("webcam");
+  const canvas = document.getElementById("output-canvas");
+  const ctx = canvas.getContext("2d");
+  
+  const loadingOverlay = document.getElementById("loading-overlay");
+  const permissionOverlay = document.getElementById("permission-overlay");
+  const btnRequestPermission = document.getElementById("btn-request-permission");
+  const noFaceWarning = document.getElementById("no-face-warning");
+  const flashScreen = document.getElementById("flash-screen");
+  
+  const btnFlip = document.getElementById("btn-flip");
+  const btnCapture = document.getElementById("btn-capture");
+  const btnFullscreen = document.getElementById("btn-fullscreen");
+  
+  const hatCards = document.querySelectorAll(".hat-card");
+  const sliderScale = document.getElementById("slider-scale");
+  const sliderOffset = document.getElementById("slider-offset");
+  const valScale = document.getElementById("val-scale");
+  const valOffset = document.getElementById("val-offset");
+  const btnResetAdjust = document.getElementById("btn-reset-adjust");
+  
+  const galleryList = document.getElementById("gallery-list");
+  const photoModal = document.getElementById("photo-modal");
+  const modalPreviewImg = document.getElementById("modal-preview-img");
+  const btnDownload = document.getElementById("btn-download");
+  const btnShareDummy = document.getElementById("btn-share-dummy");
+  const modalCloseBtn = document.querySelector(".close-btn");
+
+  // State Variables
+  let faceLandmarker = null;
+  let webcamStream = null;
+  let activeHat = "headdress";
+  let useFrontCamera = true;
+  let isModelLoaded = false;
+  let lastVideoTime = -1;
+
+  // Custom offset and scale adjusters (user sliders)
+  let userScaleAdj = 100; // in percentage (50% to 250%)
+  let userOffsetAdj = 0;   // in percentage (-100% to 100%)
+
+  // Hat Settings config
+  const hatConfigs = {
+    headdress: {
+      url: "assets/headdress.png",
+      offsetY: -0.42, // relative to faceHeight (vertical offset)
+      scale: 1.85,    // multiplier for faceWidth
+      processedCanvas: null,
+      loaded: false
+    },
+    cowboy: {
+      url: "assets/cowboy.png",
+      offsetY: -0.22,
+      scale: 1.75,
+      processedCanvas: null,
+      loaded: false
+    },
+    nonla: {
+      url: "assets/nonla.png",
+      offsetY: -0.28,
+      scale: 1.95,
+      processedCanvas: null,
+      loaded: false
+    },
+    pharaoh: {
+      url: "assets/pharaoh.png",
+      offsetY: -0.05,
+      scale: 1.70,
+      processedCanvas: null,
+      loaded: false
+    }
+  };
+
+  // Preprocess hat images to remove white backgrounds (Chroma Key)
+  function preprocessHats() {
+    const promises = Object.keys(hatConfigs).map((key) => {
+      return new Promise((resolve) => {
+        const config = hatConfigs[key];
+        const img = new Image();
+        img.src = config.url;
+        img.onload = () => {
+          const offscreenCanvas = document.createElement("canvas");
+          offscreenCanvas.width = img.naturalWidth;
+          offscreenCanvas.height = img.naturalHeight;
+          const oCtx = offscreenCanvas.getContext("2d");
+          oCtx.drawImage(img, 0, 0);
+
+          const imgData = oCtx.getImageData(0, 0, offscreenCanvas.width, offscreenCanvas.height);
+          const data = imgData.data;
+
+          // Key out background pixels that are close to white
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Distance from pure white (255, 255, 255)
+            const dist = Math.sqrt((255 - r) ** 2 + (255 - g) ** 2 + (255 - b) ** 2);
+
+            if (dist < 40) {
+              data[i + 3] = 0; // Make fully transparent
+            } else if (dist < 60) {
+              // Smooth transition threshold
+              const ratio = (dist - 40) / 20;
+              data[i + 3] = Math.floor(ratio * 255);
+            }
+          }
+          oCtx.putImageData(imgData, 0, 0);
+          config.processedCanvas = offscreenCanvas;
+          config.loaded = true;
+          resolve();
+        };
+        img.onerror = () => {
+          console.error(`Failed to load hat image asset: ${config.url}`);
+          resolve();
+        };
+      });
+    });
+    return Promise.all(promises);
+  }
+
+  // Initialize MediaPipe Face Landmarker
+  async function initFaceLandmarker() {
+    try {
+      const vision = window.vision;
+      if (!vision) {
+        throw new Error("MediaPipe Vision library was not loaded successfully.");
+      }
+
+      // Initialize the fileset resolver for vision tasks
+      const filesetResolver = await vision.FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
+      );
+
+      // Create FaceLandmarker
+      faceLandmarker = await vision.FaceLandmarker.createFromOptions(filesetResolver, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "GPU"
+        },
+        outputFaceBlendshapes: false,
+        outputFacialTransformationMatrixes: false,
+        runningMode: "VIDEO",
+        numFaces: 1
+      });
+
+      isModelLoaded = true;
+      console.log("MediaPipe Face Landmarker loaded successfully!");
+    } catch (err) {
+      console.error("Error loading MediaPipe Face Landmarker:", err);
+      alert("AR 엔진을 초기화하지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+    }
+  }
+
+  // Start Camera Stream
+  async function startCamera() {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach((track) => track.stop());
+    }
+
+    const constraints = {
+      video: {
+        facingMode: useFrontCamera ? "user" : "environment",
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      },
+      audio: false
+    };
+
+    try {
+      webcamStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = webcamStream;
+      video.addEventListener("loadedmetadata", () => {
+        video.play();
+        permissionOverlay.classList.add("hidden");
+        // Adjust canvas dimensions to match the video feed aspect ratio
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        requestAnimationFrame(predictLoop);
+      });
+    } catch (err) {
+      console.error("Camera access denied or failed:", err);
+      permissionOverlay.classList.remove("hidden");
+      loadingOverlay.classList.add("hidden");
+    }
+  }
+
+  // Main real-time prediction and rendering loop
+  function predictLoop() {
+    if (!video.srcObject || video.paused || video.ended) {
+      return;
+    }
+
+    // Check if we have new video frames
+    let now = video.currentTime;
+    if (now !== lastVideoTime) {
+      lastVideoTime = now;
+
+      // Draw original video frame onto canvas
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      if (isModelLoaded && faceLandmarker) {
+        // Detect landmarks
+        const result = faceLandmarker.detectForVideo(video, performance.now());
+        
+        if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
+          noFaceWarning.classList.add("hidden");
+          const landmarks = result.faceLandmarks[0];
+
+          // Key Landmarks used for head mounting:
+          // 10: Forehead/hairline center
+          // 152: Chin center
+          // 234: Left temple (relative to camera coordinates)
+          // 454: Right temple (relative to camera coordinates)
+          const landmark10 = landmarks[10];
+          const landmark152 = landmarks[152];
+          const landmark234 = landmarks[234];
+          const landmark454 = landmarks[454];
+
+          // Dimensions & distance metrics
+          const faceWidth = Math.hypot(landmark454.x - landmark234.x, landmark454.y - landmark234.y);
+          const faceHeight = Math.hypot(landmark10.x - landmark152.x, landmark10.y - landmark152.y);
+
+          // Position target
+          const anchorX = landmark10.x * canvas.width;
+          const anchorY = landmark10.y * canvas.height;
+
+          // Rotation angle (Roll)
+          const dx = landmark454.x - landmark234.x;
+          const dy = landmark454.y - landmark234.y;
+          const rollAngle = Math.atan2(dy, dx);
+
+          // Draw the active hat
+          const hatConfig = hatConfigs[activeHat];
+          if (hatConfig && hatConfig.loaded && hatConfig.processedCanvas) {
+            ctx.save();
+            ctx.translate(anchorX, anchorY);
+            ctx.rotate(rollAngle);
+
+            // Compute scaling and offsets
+            const scaleMultiplier = userScaleAdj / 100;
+            const offsetAdjustY = userOffsetAdj / 100; // Range [-1.0, 1.0]
+
+            const finalScale = hatConfig.scale * scaleMultiplier;
+            // The vertical offset adjusts down/up based on faceHeight
+            const finalOffsetY = hatConfig.offsetY + (offsetAdjustY * 0.2);
+
+            const hatWidth = faceWidth * canvas.width * finalScale;
+            const hatHeight = hatWidth * (hatConfig.processedCanvas.height / hatConfig.processedCanvas.width);
+
+            const drawY = (finalOffsetY * faceHeight * canvas.height) - hatHeight;
+
+            // Draw pre-processed transparent hat canvas
+            ctx.drawImage(hatConfig.processedCanvas, -hatWidth / 2, drawY, hatWidth, hatHeight);
+            ctx.restore();
+          }
+        } else {
+          // No face detected
+          noFaceWarning.classList.remove("hidden");
+        }
+      }
+    }
+
+    requestAnimationFrame(predictLoop);
+  }
+
+  // Interactivity: Hat card selections
+  hatCards.forEach((card) => {
+    card.addEventListener("click", () => {
+      hatCards.forEach((c) => c.classList.remove("active"));
+      card.classList.add("active");
+      activeHat = card.getAttribute("data-hat");
+      
+      // Reset custom sliders when swapping hats to default configs
+      resetAdjustments();
+    });
+  });
+
+  // Sliders input events
+  sliderScale.addEventListener("input", (e) => {
+    userScaleAdj = parseInt(e.target.value);
+    valScale.textContent = `${userScaleAdj}%`;
+  });
+
+  sliderOffset.addEventListener("input", (e) => {
+    userOffsetAdj = parseInt(e.target.value);
+    valOffset.textContent = userOffsetAdj > 0 ? `+${userOffsetAdj}` : userOffsetAdj;
+  });
+
+  function resetAdjustments() {
+    userScaleAdj = 100;
+    userOffsetAdj = 0;
+    sliderScale.value = 100;
+    sliderOffset.value = 0;
+    valScale.textContent = "100%";
+    valOffset.textContent = "0";
+  }
+
+  btnResetAdjust.addEventListener("click", resetAdjustments);
+
+  // Snapshot capture button
+  btnCapture.addEventListener("click", () => {
+    // 1. Flash effect
+    flashScreen.classList.add("active");
+    setTimeout(() => flashScreen.classList.remove("active"), 500);
+
+    // 2. Export canvas to dataURL
+    // The canvas is mirrored via CSS, but to save the photo exactly as the user sees it,
+    // we can draw the canvas to a temporary canvas, mirror it, and export that!
+    // Since users prefer selfie shots to look exactly as they see on screen (mirrored),
+    // we should horizontally flip the image for export.
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tCtx = tempCanvas.getContext("2d");
+
+    // Mirror horizontal drawing
+    tCtx.translate(tempCanvas.width, 0);
+    tCtx.scale(-1, 1);
+    tCtx.drawImage(canvas, 0, 0);
+
+    const dataUrl = tempCanvas.toDataURL("image/png");
+
+    // 3. Show photo modal
+    modalPreviewImg.src = dataUrl;
+    btnDownload.href = dataUrl;
+    photoModal.classList.remove("hidden");
+
+    // 4. Add to gallery list
+    const galleryItem = document.createElement("div");
+    galleryItem.className = "gallery-item";
+    const imgEl = document.createElement("img");
+    imgEl.src = dataUrl;
+    galleryItem.appendChild(imgEl);
+    
+    // Clicking gallery item opens modal again
+    galleryItem.addEventListener("click", () => {
+      modalPreviewImg.src = dataUrl;
+      btnDownload.href = dataUrl;
+      photoModal.classList.remove("hidden");
+    });
+
+    const noImagesEl = galleryList.querySelector(".no-images");
+    if (noImagesEl) {
+      noImagesEl.remove();
+    }
+    galleryList.insertBefore(galleryItem, galleryList.firstChild);
+  });
+
+  // Flip Camera Front/Back
+  btnFlip.addEventListener("click", () => {
+    useFrontCamera = !useFrontCamera;
+    // Rotate button animation
+    btnFlip.style.transform = `rotate(${useFrontCamera ? 0 : 180}deg)`;
+    startCamera();
+  });
+
+  // Fullscreen support
+  btnFullscreen.addEventListener("click", () => {
+    const wrapper = document.querySelector(".camera-wrapper");
+    if (!document.fullscreenElement) {
+      wrapper.requestFullscreen().catch((err) => {
+        alert(`전체화면 모드를 켤 수 없습니다: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  // Request camera permission button manually
+  btnRequestPermission.addEventListener("click", () => {
+    permissionOverlay.classList.add("hidden");
+    loadingOverlay.classList.remove("hidden");
+    startCamera();
+  });
+
+  // Modal Actions
+  modalCloseBtn.addEventListener("click", () => {
+    photoModal.classList.add("hidden");
+  });
+
+  photoModal.addEventListener("click", (e) => {
+    if (e.target === photoModal) {
+      photoModal.classList.add("hidden");
+    }
+  });
+
+  btnShareDummy.addEventListener("click", () => {
+    alert("데모 페이지입니다. 나만의 멋진 모자 쓴 사진이 저장되었습니다!");
+  });
+
+  // Bootstrapping App
+  console.log("Loading Assets and Engine...");
+  await preprocessHats();
+  await initFaceLandmarker();
+  
+  // Hide loading spinner and start camera
+  loadingOverlay.classList.add("hidden");
+  startCamera();
+});

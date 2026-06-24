@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>글로벌 전통 모자 AR 피팅룸</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  <!-- MediaPipe Tasks Vision CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm/vision_bundle.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <span class="sparkle-icon">✨</span>
+        <h1>AR Hat Fitting Room</h1>
+      </div>
+      <p class="subtitle">세계 여러 나라의 전통 모자를 실시간 AR로 체험해보세요</p>
+    </header>
+
+    <main class="main-content">
+      <!-- Left: Camera Viewer -->
+      <div class="viewer-section">
+        <div class="camera-wrapper">
+          <!-- Hidden video element for stream -->
+          <video id="webcam" autoplay playsinline muted></video>
+          <!-- Main canvas for drawing video + AR overlay -->
+          <canvas id="output-canvas"></canvas>
+          
+          <!-- State Overlays -->
+          <div id="loading-overlay" class="state-overlay">
+            <div class="spinner"></div>
+            <p>AR 페이스 트래커 로딩 중...</p>
+            <span class="loading-subtext">모델 데이터를 다운로드하고 있습니다. 잠시만 기다려주세요.</span>
+          </div>
+
+          <div id="permission-overlay" class="state-overlay hidden">
+            <div class="permission-icon">📷</div>
+            <p>카메라 권한이 필요합니다</p>
+            <button id="btn-request-permission" class="primary-btn">카메라 허용하기</button>
+          </div>
+
+          <div id="no-face-warning" class="face-warning hidden">
+            <span>👤 카메라를 정면으로 바라봐 주세요</span>
+          </div>
+
+          <!-- Capture Flash Screen -->
+          <div id="flash-screen" class="flash"></div>
+        </div>
+
+        <!-- Camera Control Actions -->
+        <div class="camera-controls">
+          <button id="btn-flip" class="icon-btn" title="카메라 전환">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+              <path fill="currentColor" d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/>
+            </svg>
+          </button>
+          <button id="btn-capture" class="capture-btn" title="사진 찍기">
+            <div class="inner-circle"></div>
+          </button>
+          <button id="btn-fullscreen" class="icon-btn" title="전체화면">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+              <path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Hat Control Panel -->
+      <div class="control-section">
+        <div class="section-title">
+          <h2>전통 모자 컬렉션</h2>
+          <p>착용해보고 싶은 전통 모자를 탭해보세요</p>
+        </div>
+
+        <div class="hat-grid">
+          <!-- Card 1: Headdress -->
+          <div class="hat-card active" data-hat="headdress">
+            <div class="hat-thumbnail">
+              <img src="assets/headdress.png" alt="인디언 모자">
+            </div>
+            <div class="hat-info">
+              <h3>인디언 모자</h3>
+              <span class="country-tag">북아메리카</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Cowboy -->
+          <div class="hat-card" data-hat="cowboy">
+            <div class="hat-thumbnail">
+              <img src="assets/cowboy.png" alt="카우보이 모자">
+            </div>
+            <div class="hat-info">
+              <h3>카우보이 모자</h3>
+              <span class="country-tag">미국 서부</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Non La -->
+          <div class="hat-card" data-hat="nonla">
+            <div class="hat-thumbnail">
+              <img src="assets/nonla.png" alt="베트남 모자">
+            </div>
+            <div class="hat-info">
+              <h3>베트남 논라</h3>
+              <span class="country-tag">베트남</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Pharaoh -->
+          <div class="hat-card" data-hat="pharaoh">
+            <div class="hat-thumbnail">
+              <img src="assets/pharaoh.png" alt="파라오 모자">
+            </div>
+            <div class="hat-info">
+              <h3>파라오 왕관</h3>
+              <span class="country-tag">고대 이집트</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom adjustments (scale and vertical offset) -->
+        <div class="adjustments-panel">
+          <h3>모자 위치 조정</h3>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span>크기 조절</span>
+              <span id="val-scale">100%</span>
+            </div>
+            <input type="range" id="slider-scale" min="50" max="250" value="100">
+          </div>
+          <div class="slider-group">
+            <div class="slider-header">
+              <span>높낮이 조절</span>
+              <span id="val-offset">0</span>
+            </div>
+            <input type="range" id="slider-offset" min="-100" max="100" value="0">
+          </div>
+          <button id="btn-reset-adjust" class="secondary-btn">설정 초기화</button>
+        </div>
+
+        <!-- Captures Gallery -->
+        <div class="gallery-section">
+          <h3>촬영된 갤러리</h3>
+          <div id="gallery-list" class="gallery-list">
+            <div class="no-images">아직 촬영된 사진이 없습니다. 카메라 셔터 버튼을 눌러보세요!</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Photo Modal -->
+    <div id="photo-modal" class="modal hidden">
+      <div class="modal-content">
+        <span class="close-btn">&times;</span>
+        <h2>촬영 성공!</h2>
+        <div class="preview-img-container">
+          <img id="modal-preview-img" src="" alt="촬영 이미지">
+        </div>
+        <div class="modal-actions">
+          <a id="btn-download" href="#" download="ar-hat-photo.png" class="primary-btn">사진 다운로드</a>
+          <button id="btn-share-dummy" class="secondary-btn">SNS 공유 (데모)</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="app-footer">
+      <p>&copy; 2026 AR Hat Fitting Room. Powered by MediaPipe Face Landmarker.</p>
+    </footer>
+  </div>
+
+  <!-- App Main Script -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
